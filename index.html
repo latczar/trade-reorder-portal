@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trade Reorder Portal</title>
+  <meta name="description" content="Prototype B2B reorder portal for a wholesale distributor. All data is made up.">
+  <link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="mark" aria-hidden="true"></span>Harbour Wholesale <span class="muted">Trade</span></div>
+    <nav>
+      <a href="#/catalogue">Order</a>
+      <a href="#/basket">Basket <span id="basket-count" class="count">0</span></a>
+      <a href="#/orders">Orders</a>
+      <a href="#/intake">Email intake</a>
+      <a href="#/insight">Insight</a>
+    </nav>
+    <div class="account"><span id="account"></span><button class="link" data-action="reset">Reset demo</button></div>
+  </header>
+  <div class="notice">Prototype with made-up data. Nothing is ordered or sent anywhere.</div>
+  <main id="view"></main>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
