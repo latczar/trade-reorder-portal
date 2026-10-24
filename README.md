@@ -5,9 +5,10 @@
 <p align="center">JavaScript · Node · Claude API · prototype · MIT · <a href="https://latczar.github.io/trade-reorder-portal/">Live demo</a></p>
 
 <p align="center">
-  <img src="docs/screenshots/01-order.jpg" width="32%" alt="Order page: the customer's usual products and the catalogue with their contract prices and stock">
-  <img src="docs/screenshots/02-email-intake.jpg" width="32%" alt="Email intake: an order email turned into suggested lines, with an out-of-stock line flagged">
-  <img src="docs/screenshots/03-insight.jpg" width="32%" alt="Insight: share of orders through the portal against a 90% target, and the ERP sync log">
+  <img src="docs/screenshots/01-home.png" width="49%" alt="Home: the customer's trade account, categories and their usual products">
+  <img src="docs/screenshots/03-product.png" width="49%" alt="Product page: contract price, saving, stock, minimum order and delivery details">
+  <img src="docs/screenshots/02-shop.png" width="49%" alt="Shop: all products with category filters and search">
+  <img src="docs/screenshots/02-email-intake.jpg" width="49%" alt="Email intake: an order email turned into suggested lines, with an out-of-stock line flagged">
 </p>
 
 ## Why it exists
@@ -18,6 +19,7 @@ All data is made up. Nothing is ordered or sent anywhere.
 
 ## What it does
 
+- **A proper shop front.** Home page, category browsing, search, product pages with the customer's own price and saving, and related products.
 - **Reorder in a few clicks.** Each customer sees their usual products, their own contract prices and live stock. Any past order can be added to the basket in one click.
 - **Checks before it accepts.** Minimum quantities, stock, delivery days and the 2pm cut-off, purchase order numbers and credit limits are all checked, with a plain explanation for anything that blocks an order.
 - **Email intake with AI.** The sales team pastes an order email. Claude suggests the order lines, the code checks every suggestion against the catalogue and stock, and a person approves them. Items the model couldn't match, or lines that fail a check, are left out for a person to sort.
@@ -51,6 +53,7 @@ Then open http://localhost:5173. To use Claude for email intake, deploy to Verce
 | `src/logic.js` | Business rules: pricing, stock and checkout checks, delivery dates. No DOM, fully unit tested |
 | `src/intake.js` | Email intake: calls the API, falls back to the keyword matcher, checks suggestions |
 | `src/app.js` | The screens and the mock ERP sync |
+| `src/images.js` | Drawn product images, so the demo needs no photo licences |
 | `api/parse-order.js` | Serverless function that calls Claude with structured output |
 | `tests/` | Unit tests for the rules and the intake checks |
 

@@ -4,6 +4,7 @@ import {
   mergeLines, usuals, digitalShare, localIso, MAX_ERP_ATTEMPTS, retryDelayMs,
 } from "./logic.js";
 import { parseEmail, reviewSuggestions, SAMPLE_EMAILS } from "./intake.js";
+import { productImage, categoryImage } from "./images.js";
 
 // ---------- State (localStorage keeps the basket across refreshes; the app works without it) ----------
 
@@ -106,6 +107,95 @@ function viewCatalogue() {
         </tbody>
       </table></div>
     </section>`;
+}
+
+
+function card(p) {
+  return `<article class="card">
+    <a class="card-img" href="#/product/${p.sku}" aria-label="${esc(p.name)}">${productImage(p)}</a>
+    <div class="card-body">
+      <a class="card-title" href="#/product/${p.sku}">${esc(p.name)}</a>
+      <div class="muted small">${esc(p.pack)}</div>
+      <div class="card-foot">
+        <div><strong>${money(price(p))}</strong> <span class="muted small strike">${money(p.listPrice)}</span><div>${stockLabel(p)}</div></div>
+        <button class="btn small primary" data-add="${p.sku}" data-qty="${p.minQty}" ${p.stock === 0 ? "disabled" : ""}>Add</button>
+      </div>
+    </div>
+  </article>`;
+}
+
+function viewHome() {
+  const mine = usuals(state.orders, 4).map(({ sku }) => product(sku));
+  const last = state.orders[0];
+  return `
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Trade account · ${esc(CUSTOMER.name)}</p>
+        <h1>Everything your café needs, delivered ${CUSTOMER.deliveryDays.length} days a week.</h1>
+        <p class="muted">Your contract prices, live stock and order by 2pm for next-day delivery.</p>
+        <div class="row"><a class="btn primary" href="#/shop">Shop all products</a>
+          ${last ? `<button class="btn" data-reorder="${last.id}">Reorder last order (${last.id})</button>` : ""}</div>
+      </div>
+      <div class="hero-img">${productImage(product("CT-101"))}</div>
+    </section>
+
+    <section>
+      <div class="section-head"><h2>Shop by category</h2></div>
+      <div class="cats">
+        ${CATEGORIES.map((c) => `<a class="cat" href="#/shop" data-cat="${esc(c)}">${categoryImage(c, PRODUCTS)}<span>${esc(c)}</span></a>`).join("")}
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head"><h2>Your usuals</h2><a href="#/shop">See everything</a></div>
+      <div class="grid">${mine.map(card).join("")}</div>
+    </section>`;
+}
+
+function viewShop() {
+  const q = ui.query.toLowerCase();
+  const list = PRODUCTS.filter((p) =>
+    (ui.category === "All" || p.category === ui.category) &&
+    (!q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)));
+  return `
+    <div class="shop">
+      <aside class="filters-side">
+        <h2>Categories</h2>
+        ${["All", ...CATEGORIES].map((c) => `<button class="cat-link ${c === ui.category ? "on" : ""}" data-filter="${esc(c)}">${esc(c)}</button>`).join("")}
+      </aside>
+      <section>
+        <div class="section-head">
+          <h2>${ui.category === "All" ? "All products" : esc(ui.category)} <span class="muted small">${list.length} items</span></h2>
+          <input id="search" type="search" placeholder="Search by name or code" value="${esc(ui.query)}" aria-label="Search products">
+        </div>
+        <div class="grid">${list.map(card).join("") || `<p class="muted">No products match. Try a shorter search.</p>`}</div>
+      </section>
+    </div>`;
+}
+
+function viewProduct(sku) {
+  const p = product(sku);
+  if (!p) return `<section class="panel empty-state"><h2>Product not found</h2><a class="btn" href="#/shop">Back to the shop</a></section>`;
+  const related = PRODUCTS.filter((x) => x.category === p.category && x.sku !== p.sku).slice(0, 4);
+  const saving = p.listPrice - price(p);
+  return `
+    <p class="crumbs"><a href="#/shop">Shop</a> / <button class="link" data-filter="${esc(p.category)}">${esc(p.category)}</button> / ${esc(p.name)}</p>
+    <section class="pdp">
+      <div class="pdp-img">${productImage(p)}</div>
+      <div class="pdp-info">
+        <h1>${esc(p.name)}</h1>
+        <p class="muted">${esc(p.pack)} · Code ${p.sku}</p>
+        <p class="pdp-price">${money(price(p))} <span class="muted small">per pack, ${p.vat ? "plus VAT" : "zero-rated VAT"}</span></p>
+        <p class="small">Your band ${CUSTOMER.priceBand} price saves ${money(saving)} on the list price of ${money(p.listPrice)}.</p>
+        <p>${stockLabel(p)}${p.minQty > 1 ? ` <span class="muted small">· Minimum order ${p.minQty} packs</span>` : ""}</p>
+        <div class="row">
+          <input class="qty" type="number" min="${p.minQty}" value="${p.minQty}" data-qty-for="${p.sku}" aria-label="Quantity" ${p.stock === 0 ? "disabled" : ""}>
+          <button class="btn primary" data-add="${p.sku}" ${p.stock === 0 ? "disabled" : ""}>Add to basket</button>
+        </div>
+        <ul class="perks small muted"><li>Order by 2pm for the next delivery day</li><li>Delivered to either of your sites</li><li>Pay on account, ${money(CUSTOMER.creditLimit - CUSTOMER.creditUsed)} credit available</li></ul>
+      </div>
+    </section>
+    ${related.length ? `<section><div class="section-head"><h2>More in ${esc(p.category)}</h2></div><div class="grid">${related.map(card).join("")}</div></section>` : ""}`;
 }
 
 function viewIntake() {
@@ -339,16 +429,19 @@ async function readEmail() {
 
 // ---------- Render and events ----------
 
-const ROUTES = { catalogue: viewCatalogue, intake: viewIntake, basket: viewBasket, orders: viewOrders, insight: viewInsight };
+const ROUTES = { home: viewHome, shop: viewShop, product: viewProduct, catalogue: viewCatalogue, intake: viewIntake, basket: viewBasket, orders: viewOrders, insight: viewInsight };
 
 function render() {
-  const route = location.hash.replace("#/", "") || "catalogue";
-  const view = ROUTES[route] ?? viewCatalogue;
+  const [route, arg] = (location.hash.replace("#/", "") || "home").split("/");
+  const view = ROUTES[route] ?? viewHome;
+  const key = route + (arg ?? "");
+  if (key !== render.last) window.scrollTo(0, 0);
+  render.last = key;
   const active = document.activeElement;
   const focusId = active?.id;
   const caret = active?.selectionStart;
-  $("#view").innerHTML = view();
-  document.querySelectorAll("nav a").forEach((a) => a.classList.toggle("active", a.getAttribute("href") === "#/" + route));
+  $("#view").innerHTML = view(arg);
+  document.querySelectorAll("nav a").forEach((a) => a.classList.toggle("active", a.getAttribute("href") === "#/" + (route === "product" ? "shop" : route)));
   $("#basket-count").textContent = basketCount();
   const el = focusId && document.getElementById(focusId);
   if (el) {
@@ -358,9 +451,12 @@ function render() {
 }
 
 document.addEventListener("click", (e) => {
+  const cat = e.target.closest("[data-cat]");
+  if (cat) { ui.category = cat.dataset.cat; ui.query = ""; }
   const t = e.target.closest("button");
   if (!t) return;
   const d = t.dataset;
+  if (d.filter) { ui.category = d.filter; if (location.hash !== "#/shop") location.hash = "#/shop"; else render(); return; }
   if (d.add) {
     const input = document.querySelector(`[data-qty-for="${d.add}"]`);
     addToBasket(d.add, Number(d.qty ?? input?.value ?? 1));
@@ -399,7 +495,7 @@ document.addEventListener("click", (e) => {
   } else if (d.action === "place") {
     placeOrder();
   } else if (d.action === "reset") {
-    state = fresh(); save(); location.hash = "#/catalogue"; render();
+    state = fresh(); save(); location.hash = "#/home"; render();
     toast("Demo data reset.");
   }
 });
