@@ -1,9 +1,9 @@
 import { CUSTOMER, CATEGORIES, PRODUCTS, BAND_DISCOUNT, SEED_ORDERS, CHANNEL_MIX, DIGITAL_TARGET } from "./data.js";
 import {
   unitPrice, lineProblems, basketTotals, checkoutProblems, deliveryOptions,
-  mergeLines, usuals, digitalShare, localIso, MAX_ERP_ATTEMPTS, retryDelayMs,
+  mergeLines, usuals, digitalShare, localIso, restockSuggestions, MAX_ERP_ATTEMPTS, retryDelayMs,
 } from "./logic.js";
-import { parseEmail, reviewSuggestions, SAMPLE_EMAILS } from "./intake.js";
+import { parseEmail, reviewSuggestions, fallbackParse, SAMPLE_EMAILS } from "./intake.js";
 import { productImage, categoryImage } from "./images.js";
 
 // ---------- State (localStorage keeps the basket across refreshes; the app works without it) ----------
@@ -45,12 +45,26 @@ function stockLabel(p) {
   return `<span class="stock">In stock</span>`;
 }
 
-function toast(msg) {
+function toast(msg, undo) {
   const el = $("#toast");
-  el.textContent = msg;
+  el.innerHTML = esc(msg) + (undo ? ` <button class="link toast-undo" data-action="undo">Undo</button>` : "");
+  toast.undo = undo;
   el.hidden = false;
   clearTimeout(toast.t);
-  toast.t = setTimeout(() => (el.hidden = true), 2800);
+  toast.t = setTimeout(() => { el.hidden = true; toast.undo = null; }, undo ? 6000 : 2800);
+}
+
+const inBasket = (sku) => state.basket.find((l) => l.sku === sku)?.qty ?? 0;
+
+// Add button, or a - qty + stepper once the product is in the basket.
+function addControl(p, big = false) {
+  if (p.stock === 0) return `<button class="btn small" disabled>Out of stock</button>`;
+  const q = inBasket(p.sku);
+  if (!q) return `<button class="btn ${big ? "" : "small"} primary" data-add="${p.sku}" data-qty="${p.minQty}">Add${big ? " to basket" : ""}</button>`;
+  return `<div class="stepper" role="group" aria-label="Quantity of ${esc(p.name)} in basket">
+    <button data-step="-1" data-sku="${p.sku}" aria-label="One fewer">−</button>
+    <span aria-live="polite">${q}</span>
+    <button data-step="1" data-sku="${p.sku}" aria-label="One more" ${q >= p.stock ? "disabled" : ""}>+</button></div>`;
 }
 
 function addToBasket(sku, qty) {
@@ -60,7 +74,7 @@ function addToBasket(sku, qty) {
 
 // ---------- Views ----------
 
-const ui = { query: "", category: "All", openOrder: null, email: SAMPLE_EMAILS[0], intake: null, reading: false };
+const ui = { quickText: "", quick: null, query: "", category: "All", openOrder: null, email: SAMPLE_EMAILS[0], intake: null, reading: false };
 
 function viewCatalogue() {
   const q = ui.query.toLowerCase();
@@ -87,7 +101,7 @@ function viewCatalogue() {
       <div class="panel-head">
         <h2>Catalogue</h2>
         <div class="filters">
-          <input id="search" type="search" placeholder="Search by name or code" value="${esc(ui.query)}" aria-label="Search products">
+          <input id="search" type="search" placeholder="Search by name or code…" autocomplete="off" value="${esc(ui.query)}" aria-label="Search products">
           <select id="category" aria-label="Category">
             ${["All", ...CATEGORIES].map((c) => `<option ${c === ui.category ? "selected" : ""}>${esc(c)}</option>`).join("")}
           </select>
@@ -118,10 +132,42 @@ function card(p) {
       <div class="muted small">${esc(p.pack)}</div>
       <div class="card-foot">
         <div><strong>${money(price(p))}</strong> <span class="muted small strike">${money(p.listPrice)}</span><div>${stockLabel(p)}</div></div>
-        <button class="btn small primary" data-add="${p.sku}" data-qty="${p.minQty}" ${p.stock === 0 ? "disabled" : ""}>Add</button>
+        ${addControl(p)}
       </div>
     </div>
   </article>`;
+}
+
+function viewRestock() {
+  const due = restockSuggestions(state.orders, new Date(), 4).filter((s) => product(s.sku)?.stock > 0);
+  if (!due.length) return `<section class="panel"><h2>Running low?</h2><p class="muted small">Nothing looks due yet. We'll suggest a restock here when your usual pattern says you're close to running out.</p></section>`;
+  return `<section class="panel">
+    <div class="panel-head"><h2>Likely running low</h2><span class="muted small">From your ordering pattern</span></div>
+    <ul class="restock">
+      ${due.map((s) => { const p = product(s.sku); return `<li>
+        <div class="thumb">${productImage(p)}</div>
+        <div><strong>${esc(p.name)}</strong><div class="muted small">You order about every ${s.every} days · ${s.daysLeft <= 0 ? "due now" : `due in ${s.daysLeft} day${s.daysLeft === 1 ? "" : "s"}`}</div></div>
+        <div class="muted small nowrap">${s.qty} × ${money(price(p))}</div></li>`; }).join("")}
+    </ul>
+    <button class="btn primary block" data-action="restock">Add ${due.length} suggested item${due.length === 1 ? "" : "s"}</button>
+  </section>`;
+}
+
+function viewQuickOrder() {
+  const r = ui.quick;
+  const reviewed = r ? reviewSuggestions(r, PRODUCTS) : [];
+  const ok = reviewed.filter((l) => l.ok);
+  return `<section class="panel">
+    <div class="panel-head"><h2>Type your order</h2><span class="muted small">Like a text to your rep</span></div>
+    <label class="sr-only" for="quick-text">Type your order</label>
+    <textarea id="quick-text" rows="3" placeholder="e.g. 2 espresso beans, 4 12oz cups, 6 whole milk…" autocomplete="off">${esc(ui.quickText)}</textarea>
+    <button class="btn block" data-action="quick">Find these products</button>
+    ${r ? `<ul class="quick-list">
+      ${reviewed.map((l) => `<li class="${l.ok ? "" : "bad"}"><span>${l.qty} × ${esc(product(l.sku)?.name ?? l.sku)}</span><span class="small">${l.ok ? "Found" : esc(l.issues[0])}</span></li>`).join("")}
+      ${r.unmatched.map((u) => `<li class="bad"><span>“${esc(u)}”</span><span class="small">Not found</span></li>`).join("")}
+    </ul>
+    ${ok.length ? `<button class="btn primary block" data-action="quick-add">Add ${ok.length} to basket</button>` : ""}` : ""}
+  </section>`;
 }
 
 function viewHome() {
@@ -139,10 +185,15 @@ function viewHome() {
       <div class="hero-img">${productImage(product("CT-101"))}</div>
     </section>
 
+    <div class="split even">
+      ${viewRestock()}
+      ${viewQuickOrder()}
+    </div>
+
     <section>
       <div class="section-head"><h2>Shop by category</h2></div>
       <div class="cats">
-        ${CATEGORIES.map((c) => `<a class="cat" href="#/shop" data-cat="${esc(c)}">${categoryImage(c, PRODUCTS)}<span>${esc(c)}</span></a>`).join("")}
+        ${CATEGORIES.map((c) => `<a class="cat" href="#/shop?cat=${encodeURIComponent(c)}">${categoryImage(c, PRODUCTS)}<span>${esc(c)}</span></a>`).join("")}
       </div>
     </section>
 
@@ -166,7 +217,7 @@ function viewShop() {
       <section>
         <div class="section-head">
           <h2>${ui.category === "All" ? "All products" : esc(ui.category)} <span class="muted small">${list.length} items</span></h2>
-          <input id="search" type="search" placeholder="Search by name or code" value="${esc(ui.query)}" aria-label="Search products">
+          <input id="search" type="search" placeholder="Search by name or code…" autocomplete="off" value="${esc(ui.query)}" aria-label="Search products">
         </div>
         <div class="grid">${list.map(card).join("") || `<p class="muted">No products match. Try a shorter search.</p>`}</div>
       </section>
@@ -189,8 +240,8 @@ function viewProduct(sku) {
         <p class="small">Your band ${CUSTOMER.priceBand} price saves ${money(saving)} on the list price of ${money(p.listPrice)}.</p>
         <p>${stockLabel(p)}${p.minQty > 1 ? ` <span class="muted small">· Minimum order ${p.minQty} packs</span>` : ""}</p>
         <div class="row">
-          <input class="qty" type="number" min="${p.minQty}" value="${p.minQty}" data-qty-for="${p.sku}" aria-label="Quantity" ${p.stock === 0 ? "disabled" : ""}>
-          <button class="btn primary" data-add="${p.sku}" ${p.stock === 0 ? "disabled" : ""}>Add to basket</button>
+          ${addControl(p, true)}
+          ${inBasket(p.sku) ? `<a class="btn" href="#/basket">Go to basket</a>` : ""}
         </div>
         <ul class="perks small muted"><li>Order by 2pm for the next delivery day</li><li>Delivered to either of your sites</li><li>Pay on account, ${money(CUSTOMER.creditLimit - CUSTOMER.creditUsed)} credit available</li></ul>
       </div>
@@ -264,9 +315,9 @@ function viewBasket() {
               return `<tr class="${issues.length ? "has-issue" : ""}">
                 <td><strong>${esc(p.name)}</strong><div class="muted small">${p.sku} · ${esc(p.pack)}</div>
                   ${issues.map((i) => `<div class="issue">${esc(i)}</div>`).join("")}</td>
-                <td class="num">${money(price(p))}</td>
-                <td class="num"><input class="qty" type="number" min="1" value="${l.qty}" data-line="${p.sku}" aria-label="Quantity for ${esc(p.name)}"></td>
-                <td class="num">${money(price(p) * l.qty)}</td>
+                <td class="num" data-label="Price">${money(price(p))}</td>
+                <td class="num" data-label="Qty">${addControl(p)}</td>
+                <td class="num" data-label="Total">${money(price(p) * l.qty)}</td>
                 <td class="num"><button class="link" data-remove="${p.sku}">Remove</button></td>
               </tr>`;
             }).join("")}
@@ -286,7 +337,7 @@ function viewBasket() {
           <span class="hint">Order by 2pm for the next delivery day.</span>
         </label>
         <label>Purchase order number
-          <input id="po" type="text" value="${esc(state.po)}" placeholder="e.g. NG-0940">
+          <input id="po" type="text" value="${esc(state.po)}" placeholder="e.g. NG-0940…" autocomplete="off" spellcheck="false">
         </label>
         <dl class="totals">
           <div><dt>Net</dt><dd>${money(totals.net)}</dd></div>
@@ -314,12 +365,12 @@ function viewOrders() {
             const open = ui.openOrder === o.id;
             return `<tr>
               <td><button class="link" data-open="${o.id}" aria-expanded="${open}">${o.id}</button></td>
-              <td>${fmtDate(o.date)}</td>
-              <td>${esc(o.po)}</td>
-              <td class="cap">${esc(o.channel)}</td>
-              <td>${esc(o.status)}<div class="erp ${o.erp}">${ERP_LABEL[o.erp]}</div></td>
-              <td class="num">${money(t.gross)}</td>
-              <td class="num nowrap"><button class="btn small" data-reorder="${o.id}">Reorder</button>
+              <td data-label="Date">${fmtDate(o.date)}</td>
+              <td data-label="PO">${esc(o.po)}</td>
+              <td class="cap" data-label="Received by">${esc(o.channel)}</td>
+              <td data-label="Status">${esc(o.status)}<div class="erp ${o.erp}">${ERP_LABEL[o.erp]}</div></td>
+              <td class="num" data-label="Total">${money(t.gross)}</td>
+              <td class="num nowrap actions"><button class="btn small" data-reorder="${o.id}">Reorder</button>
                 ${o.erp === "failed" ? `<button class="btn small" data-retry="${o.id}">Retry</button>` : ""}</td>
             </tr>
             ${open ? `<tr class="detail"><td colspan="7">${o.lines.map((l) => `${l.qty} x ${esc(product(l.sku).name)}`).join(" · ")}</td></tr>` : ""}`;
@@ -432,7 +483,10 @@ async function readEmail() {
 const ROUTES = { home: viewHome, shop: viewShop, product: viewProduct, catalogue: viewCatalogue, intake: viewIntake, basket: viewBasket, orders: viewOrders, insight: viewInsight };
 
 function render() {
-  const [route, arg] = (location.hash.replace("#/", "") || "home").split("/");
+  const [path, query] = location.hash.replace("#/", "").split("?");
+  const [route, arg] = (path || "home").split("/");
+  const cat = new URLSearchParams(query ?? "").get("cat");
+  if (route === "shop") ui.category = cat && CATEGORIES.includes(cat) ? cat : "All";
   const view = ROUTES[route] ?? viewHome;
   const key = route + (arg ?? "");
   if (key !== render.last) window.scrollTo(0, 0);
@@ -443,6 +497,12 @@ function render() {
   $("#view").innerHTML = view(arg);
   document.querySelectorAll("nav a").forEach((a) => a.classList.toggle("active", a.getAttribute("href") === "#/" + (route === "product" ? "shop" : route)));
   $("#basket-count").textContent = basketCount();
+  $("#tab-count").textContent = basketCount();
+  document.querySelectorAll(".tabbar a").forEach((a) => a.classList.toggle("active", a.getAttribute("href") === "#/" + (route === "product" ? "shop" : route)));
+  const bar = $("#basketbar");
+  const showBar = basketCount() > 0 && ["home", "shop", "product", "catalogue"].includes(route);
+  bar.hidden = !showBar;
+  if (showBar) bar.innerHTML = `<span>${basketCount()} item${basketCount() === 1 ? "" : "s"} · ${money(basketTotals(state.basket, PRODUCTS, CUSTOMER.priceBand, BAND_DISCOUNT).gross)}</span><strong>View basket →</strong>`;
   const el = focusId && document.getElementById(focusId);
   if (el) {
     el.focus();
@@ -451,17 +511,23 @@ function render() {
 }
 
 document.addEventListener("click", (e) => {
-  const cat = e.target.closest("[data-cat]");
-  if (cat) { ui.category = cat.dataset.cat; ui.query = ""; }
   const t = e.target.closest("button");
   if (!t) return;
   const d = t.dataset;
-  if (d.filter) { ui.category = d.filter; if (location.hash !== "#/shop") location.hash = "#/shop"; else render(); return; }
+  if (d.filter) { location.hash = d.filter === "All" ? "#/shop" : "#/shop?cat=" + encodeURIComponent(d.filter); return; }
+  if (d.step) {
+    const sku = d.sku;
+    const qty = inBasket(sku) + Number(d.step);
+    set({ basket: qty <= 0 ? state.basket.filter((l) => l.sku !== sku) : state.basket.map((l) => (l.sku === sku ? { ...l, qty } : l)) });
+    return;
+  }
   if (d.add) {
     const input = document.querySelector(`[data-qty-for="${d.add}"]`);
     addToBasket(d.add, Number(d.qty ?? input?.value ?? 1));
   } else if (d.remove) {
+    const before = state.basket;
     set({ basket: state.basket.filter((l) => l.sku !== d.remove) });
+    toast(`Removed ${product(d.remove).name}.`, () => set({ basket: before }));
   } else if (d.reorder) {
     const o = state.orders.find((x) => x.id === d.reorder);
     set({ basket: mergeLines(state.basket, o.lines) });
@@ -491,7 +557,26 @@ document.addEventListener("click", (e) => {
     location.hash = "#/basket";
     toast(`Added ${ok.length} approved lines. Check the details and place the order.`);
   } else if (d.action === "clear") {
+    const before = state.basket;
     set({ basket: [] });
+    toast("Basket emptied.", () => set({ basket: before }));
+  } else if (d.action === "undo") {
+    toast.undo?.();
+    $("#toast").hidden = true;
+  } else if (d.action === "restock") {
+    const due = restockSuggestions(state.orders, new Date(), 4).filter((s) => product(s.sku)?.stock > 0);
+    set({ basket: mergeLines(state.basket, due.map(({ sku, qty }) => ({ sku, qty }))) });
+    toast(`Added ${due.length} suggested items.`);
+  } else if (d.action === "quick") {
+    ui.quickText = $("#quick-text").value;
+    ui.quick = fallbackParse(ui.quickText, PRODUCTS);
+    render();
+  } else if (d.action === "quick-add") {
+    const ok = reviewSuggestions(ui.quick, PRODUCTS).filter((l) => l.ok).map(({ sku, qty }) => ({ sku, qty }));
+    ui.quick = null;
+    ui.quickText = "";
+    set({ basket: mergeLines(state.basket, ok) });
+    toast(`Added ${ok.length} items to your basket.`);
   } else if (d.action === "place") {
     placeOrder();
   } else if (d.action === "reset") {

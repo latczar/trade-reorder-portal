@@ -10,6 +10,10 @@
   <img src="docs/screenshots/02-shop.png" width="49%" alt="Shop: all products with category filters and search">
   <img src="docs/screenshots/02-email-intake.jpg" width="49%" alt="Email intake: an order email turned into suggested lines, with an out-of-stock line flagged">
 </p>
+<p align="center">
+  <img src="docs/screenshots/04-mobile-home.jpg" width="24%" alt="Mobile home: restock suggestions, basket bar and bottom tabs">
+  <img src="docs/screenshots/05-mobile-shop.jpg" width="24%" alt="Mobile shop: two-column product grid with quantity steppers">
+</p>
 
 ## Why it exists
 
@@ -20,6 +24,9 @@ All data is made up. Nothing is ordered or sent anywhere.
 ## What it does
 
 - **A proper shop front.** Home page, category browsing, search, product pages with the customer's own price and saving, and related products.
+- **Smart restock.** Learns how often the customer orders each product and suggests what is likely running low, with one tap to add it all.
+- **Type your order.** Customers can type an order the way they'd text their rep ("2 espresso beans, 4 12oz cups") and the shop finds the products.
+- **Built for phones.** Bottom tab bar, a basket bar that follows you, quantity steppers, swipeable categories, and tables that turn into cards. Remove and empty-basket actions can be undone.
 - **Reorder in a few clicks.** Each customer sees their usual products, their own contract prices and live stock. Any past order can be added to the basket in one click.
 - **Checks before it accepts.** Minimum quantities, stock, delivery days and the 2pm cut-off, purchase order numbers and credit limits are all checked, with a plain explanation for anything that blocks an order.
 - **Email intake with AI.** The sales team pastes an order email. Claude suggests the order lines, the code checks every suggestion against the catalogue and stock, and a person approves them. Items the model couldn't match, or lines that fail a check, are left out for a person to sort.

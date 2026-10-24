@@ -95,3 +95,29 @@ export function retryDelayMs(attempt) {
 export function localIso(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
+
+// Smart restock: from how often each product is ordered, work out which ones are probably due.
+// Needs at least two past orders of a product to see a pattern.
+export function restockSuggestions(orders, today, horizonDays = 3) {
+  const day = 86400000;
+  const bySku = new Map();
+  for (const o of orders) for (const l of o.lines) {
+    if (!bySku.has(l.sku)) bySku.set(l.sku, []);
+    bySku.get(l.sku).push({ date: new Date(o.date + "T00:00:00"), qty: l.qty });
+  }
+  const out = [];
+  for (const [sku, hist] of bySku) {
+    if (hist.length < 2) continue;
+    hist.sort((a, b) => a.date - b.date);
+    const gaps = hist.slice(1).map((h, i) => (h.date - hist[i].date) / day);
+    const every = Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length);
+    const last = hist[hist.length - 1];
+    const due = new Date(last.date.getTime() + every * day);
+    const daysLeft = Math.round((due - today) / day);
+    if (daysLeft <= horizonDays) {
+      const qty = Math.round(hist.reduce((a, h) => a + h.qty, 0) / hist.length);
+      out.push({ sku, qty, every, daysLeft });
+    }
+  }
+  return out.sort((a, b) => a.daysLeft - b.daysLeft);
+}

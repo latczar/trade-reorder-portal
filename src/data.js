@@ -36,15 +36,22 @@ export const PRODUCTS = [
 
 export const BAND_DISCOUNT = { A: 0.12, B: 0.08, C: 0.04, D: 0 };
 
+// Dates are relative to today so the demo always looks current.
+function daysAgo(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 // Seed order history. Channel shows how the order arrived, which feeds the digital-share figure.
 export const SEED_ORDERS = [
-  { id: "SO-20481", date: "2026-10-20", po: "NG-0931", site: 0, channel: "portal", status: "Delivered", erp: "synced",
+  { id: "SO-20481", date: daysAgo(4), po: "NG-0931", site: 0, channel: "portal", status: "Delivered", erp: "synced",
     lines: [{ sku: "CT-101", qty: 2 }, { sku: "DS-002", qty: 4 }, { sku: "DS-011", qty: 2 }, { sku: "DA-001", qty: 6 }] },
-  { id: "SO-20377", date: "2026-10-13", po: "NG-0918", site: 0, channel: "email", status: "Delivered", erp: "synced",
+  { id: "SO-20377", date: daysAgo(11), po: "NG-0918", site: 0, channel: "email", status: "Delivered", erp: "synced",
     lines: [{ sku: "CT-101", qty: 2 }, { sku: "DS-002", qty: 4 }, { sku: "CL-200", qty: 1 }, { sku: "DA-020", qty: 3 }] },
-  { id: "SO-20290", date: "2026-10-06", po: "NG-0902", site: 1, channel: "phone", status: "Delivered", erp: "synced",
-    lines: [{ sku: "BK-100", qty: 2 }, { sku: "BK-120", qty: 1 }, { sku: "DS-040", qty: 1 }] },
-  { id: "SO-20201", date: "2026-09-29", po: "NG-0889", site: 0, channel: "portal", status: "Delivered", erp: "synced",
+  { id: "SO-20290", date: daysAgo(18), po: "NG-0902", site: 1, channel: "phone", status: "Delivered", erp: "synced",
+    lines: [{ sku: "CT-101", qty: 2 }, { sku: "BK-100", qty: 2 }, { sku: "BK-120", qty: 1 }, { sku: "DS-040", qty: 1 }] },
+  { id: "SO-20201", date: daysAgo(25), po: "NG-0889", site: 0, channel: "portal", status: "Delivered", erp: "synced",
     lines: [{ sku: "CT-101", qty: 2 }, { sku: "DS-001", qty: 2 }, { sku: "DS-010", qty: 1 }, { sku: "DA-001", qty: 6 }] },
 ];
 

@@ -66,3 +66,15 @@ test("suggestions are never trusted: unknown SKUs and stock problems are flagged
   const reviewed = reviewSuggestions({ lines: [{ sku: "XX-999", qty: 1, note: "" }, { sku: "CT-305", qty: 1, note: "" }, { sku: "CT-101", qty: 1, note: "" }] }, PRODUCTS);
   assert.deepEqual(reviewed.map((l) => l.ok), [false, false, true]);
 });
+
+test("smart restock spots products that are due from the order pattern", async () => {
+  const { restockSuggestions } = await import("../src/logic.js");
+  const orders = [
+    { date: "2026-10-06", lines: [{ sku: "CT-101", qty: 2 }, { sku: "BK-100", qty: 1 }] },
+    { date: "2026-10-13", lines: [{ sku: "CT-101", qty: 2 }] },
+    { date: "2026-10-20", lines: [{ sku: "CT-101", qty: 4 }] },
+  ];
+  const s = restockSuggestions(orders, new Date(2026, 9, 26));
+  assert.deepEqual(s, [{ sku: "CT-101", qty: 3, every: 7, daysLeft: 1 }]);
+  assert.deepEqual(restockSuggestions(orders, new Date(2026, 9, 21)), []);
+});
