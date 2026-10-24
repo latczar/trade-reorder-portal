@@ -67,8 +67,35 @@ function addControl(p, big = false) {
     <button data-step="1" data-sku="${p.sku}" aria-label="One more" ${q >= p.stock ? "disabled" : ""}>+</button></div>`;
 }
 
-function addToBasket(sku, qty) {
+const reduceMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+// A small copy of the product image flies to the basket, then the count pops.
+function flyToBasket(fromEl) {
+  const img = fromEl?.closest(".card, .pdp, .usual, .palette-row")?.querySelector("svg");
+  const target = [...document.querySelectorAll("#basket-count, #tab-count")].find((el) => el.offsetParent);
+  if (!img || !target || reduceMotion()) return;
+  const a = img.getBoundingClientRect();
+  const b = target.getBoundingClientRect();
+  const ghost = img.cloneNode(true);
+  ghost.classList.add("fly");
+  Object.assign(ghost.style, { left: a.left + "px", top: a.top + "px", width: a.width + "px", height: a.height + "px" });
+  document.body.append(ghost);
+  ghost.animate([
+    { transform: "translate(0, 0) scale(1)", opacity: 1 },
+    { transform: `translate(${b.left - a.left - a.width / 2 + 8}px, ${b.top - a.top - a.height / 2 + 8}px) scale(0.12)`, opacity: 0.6 },
+  ], { duration: 650, easing: "cubic-bezier(.5,-0.2,.3,1)" }).finished.then(() => ghost.remove());
+}
+
+function bumpCount() {
+  if (reduceMotion()) return;
+  document.querySelectorAll("#basket-count, #tab-count").forEach((el) => el.animate(
+    [{ transform: "scale(1)" }, { transform: "scale(1.5)" }, { transform: "scale(1)" }], { duration: 400, delay: 500 }));
+}
+
+function addToBasket(sku, qty, fromEl) {
+  flyToBasket(fromEl);
   set({ basket: mergeLines(state.basket, [{ sku, qty }]) });
+  bumpCount();
   toast(`Added ${qty} x ${product(sku).name}`);
 }
 
@@ -138,6 +165,17 @@ function card(p) {
   </article>`;
 }
 
+// Live countdown to the 2pm order cut-off and the delivery date it secures.
+function cutoffText(now = new Date()) {
+  const next = deliveryOptions(now, CUSTOMER.deliveryDays)[0];
+  const cutoff = new Date(now);
+  cutoff.setHours(14, 0, 0, 0);
+  if (now >= cutoff) cutoff.setDate(cutoff.getDate() + 1);
+  const mins = Math.max(0, Math.round((cutoff - now) / 60000));
+  const h = Math.floor(mins / 60);
+  return `<span class="pulse" aria-hidden="true"></span> Order in <strong>${h ? `${h}h ` : ""}${mins % 60}m</strong> for delivery <strong>${fmtDate(next)}</strong>`;
+}
+
 function viewRestock() {
   const due = restockSuggestions(state.orders, new Date(), 4).filter((s) => product(s.sku)?.stock > 0);
   if (!due.length) return `<section class="panel"><h2>Running low?</h2><p class="muted small">Nothing looks due yet. We'll suggest a restock here when your usual pattern says you're close to running out.</p></section>`;
@@ -174,15 +212,20 @@ function viewHome() {
   const mine = usuals(state.orders, 4).map(({ sku }) => product(sku));
   const last = state.orders[0];
   return `
-    <section class="hero">
-      <div>
+    <section class="cine" id="cine">
+      <div class="cine-glow" aria-hidden="true"></div>
+      <div class="cine-copy">
         <p class="eyebrow">Trade account · ${esc(CUSTOMER.name)}</p>
-        <h1>Everything your café needs, delivered ${CUSTOMER.deliveryDays.length} days a week.</h1>
-        <p class="muted">Your contract prices, live stock and order by 2pm for next-day delivery.</p>
-        <div class="row"><a class="btn primary" href="#/shop">Shop all products</a>
-          ${last ? `<button class="btn" data-reorder="${last.id}">Reorder last order (${last.id})</button>` : ""}</div>
+        <h1>Restocking,<br><em>without the admin.</em></h1>
+        <p class="cine-sub">Your prices, live stock, and a shop that knows what you're about to run out of.</p>
+        <p class="cutoff" id="cutoff" aria-live="polite">${cutoffText()}</p>
+        <div class="row"><a class="btn glow" href="#/shop">Shop all products</a>
+          ${last ? `<button class="btn ghost" data-reorder="${last.id}">Reorder ${last.id}</button>` : ""}
+          <button class="btn ghost" data-action="palette">Search or type an order <kbd>Ctrl K</kbd></button></div>
       </div>
-      <div class="hero-img">${productImage(product("CT-101"))}</div>
+      <div class="cine-stage" aria-hidden="true">
+        ${["CT-101", "DS-002", "DA-020", "BK-100"].map((sku, i) => `<div class="float f${i}" data-depth="${(i + 1) * 6}">${productImage(product(sku))}</div>`).join("")}
+      </div>
     </section>
 
     <div class="split even">
@@ -523,7 +566,7 @@ document.addEventListener("click", (e) => {
   }
   if (d.add) {
     const input = document.querySelector(`[data-qty-for="${d.add}"]`);
-    addToBasket(d.add, Number(d.qty ?? input?.value ?? 1));
+    addToBasket(d.add, Number(d.qty ?? input?.value ?? 1), t);
   } else if (d.remove) {
     const before = state.basket;
     set({ basket: state.basket.filter((l) => l.sku !== d.remove) });
@@ -560,6 +603,8 @@ document.addEventListener("click", (e) => {
     const before = state.basket;
     set({ basket: [] });
     toast("Basket emptied.", () => set({ basket: before }));
+  } else if (d.action === "palette") {
+    openPalette();
   } else if (d.action === "undo") {
     toast.undo?.();
     $("#toast").hidden = true;
@@ -605,7 +650,101 @@ document.addEventListener("change", (e) => {
   }
 });
 
-window.addEventListener("hashchange", render);
+window.addEventListener("hashchange", () => {
+  if (document.startViewTransition && !reduceMotion()) document.startViewTransition(render);
+  else render();
+});
+
+// ---------- Command bar: search the catalogue or type a whole order ----------
+
+const pal = { open: false, q: "", sel: 0 };
+
+function paletteResults(q) {
+  const text = q.trim();
+  if (!text) return usuals(state.orders, 5).map(({ sku }) => ({ kind: "product", p: product(sku) }));
+  const results = [];
+  if (/\d/.test(text)) {
+    const ok = reviewSuggestions(fallbackParse(text, PRODUCTS), PRODUCTS).filter((l) => l.ok);
+    if (ok.length) results.push({ kind: "order", lines: ok });
+  }
+  const words = text.toLowerCase().split(/\s+/).filter(Boolean);
+  for (const p of PRODUCTS) {
+    const hay = [p.name, p.sku, p.category, p.keywords ?? ""].join(" ").toLowerCase();
+    if (words.every((w) => hay.includes(w))) results.push({ kind: "product", p });
+  }
+  const pages = [["Basket", "#/basket"], ["Orders", "#/orders"], ["Email intake", "#/intake"], ["Insight", "#/insight"]];
+  for (const [name, href] of pages) if (name.toLowerCase().includes(text.toLowerCase())) results.push({ kind: "page", name, href });
+  return results.slice(0, 8);
+}
+
+function renderPalette() {
+  const el = $("#palette");
+  el.hidden = !pal.open;
+  if (!pal.open) return;
+  const res = paletteResults(pal.q);
+  pal.sel = Math.min(pal.sel, Math.max(0, res.length - 1));
+  $("#palette-list").innerHTML = res.map((r, i) => {
+    const on = i === pal.sel ? " on" : "";
+    if (r.kind === "order") return `<li class="palette-row order${on}" data-i="${i}" role="option" aria-selected="${!!on}">
+      <span class="tag">Add order</span><span>${r.lines.map((l) => `${l.qty} × ${esc(product(l.sku).name)}`).join(", ")}</span><kbd>Enter</kbd></li>`;
+    if (r.kind === "page") return `<li class="palette-row${on}" data-i="${i}" role="option" aria-selected="${!!on}"><span class="tag">Go to</span><span>${esc(r.name)}</span></li>`;
+    return `<li class="palette-row${on}" data-i="${i}" role="option" aria-selected="${!!on}">
+      <span class="thumb">${productImage(r.p)}</span><span>${esc(r.p.name)} <span class="muted small">${esc(r.p.pack)}</span></span>
+      <span class="small">${money(price(r.p))}</span></li>`;
+  }).join("") || `<li class="palette-empty">Nothing found. Try "2 oat milk, 3 sanitiser".</li>`;
+  pal.results = res;
+}
+
+function openPalette() {
+  pal.open = true; pal.q = ""; pal.sel = 0;
+  $("#palette-input").value = "";
+  renderPalette();
+  $("#palette-input").focus();
+}
+function closePalette() { pal.open = false; renderPalette(); }
+
+function runPalette(i) {
+  const r = pal.results?.[i];
+  if (!r) return;
+  const row = document.querySelector(`.palette-row[data-i="${i}"]`);
+  if (r.kind === "order") {
+    flyToBasket(row);
+    set({ basket: mergeLines(state.basket, r.lines.map(({ sku, qty }) => ({ sku, qty }))) });
+    bumpCount();
+    toast(`Added ${r.lines.length} product${r.lines.length === 1 ? "" : "s"} to your basket.`);
+  } else if (r.kind === "page") location.hash = r.href;
+  else location.hash = "#/product/" + r.p.sku;
+  closePalette();
+}
+
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); pal.open ? closePalette() : openPalette(); return; }
+  if (!pal.open) return;
+  if (e.key === "Escape") closePalette();
+  else if (e.key === "ArrowDown") { e.preventDefault(); pal.sel = Math.min(pal.sel + 1, (pal.results?.length ?? 1) - 1); renderPalette(); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); pal.sel = Math.max(pal.sel - 1, 0); renderPalette(); }
+  else if (e.key === "Enter") { e.preventDefault(); runPalette(pal.sel); }
+});
+$("#palette-input").addEventListener("input", (e) => { pal.q = e.target.value; pal.sel = 0; renderPalette(); });
+$("#palette").addEventListener("click", (e) => {
+  if (e.target.id === "palette") return closePalette();
+  const row = e.target.closest(".palette-row");
+  if (row) runPalette(Number(row.dataset.i));
+});
+
+// ---------- Hero: gentle parallax and the live cut-off clock ----------
+
+document.addEventListener("pointermove", (e) => {
+  const stage = document.querySelector(".cine-stage");
+  if (!stage || reduceMotion() || e.pointerType !== "mouse") return;
+  const x = e.clientX / innerWidth - 0.5;
+  const y = e.clientY / innerHeight - 0.5;
+  stage.querySelectorAll(".float").forEach((f) => {
+    const d = Number(f.dataset.depth);
+    f.style.translate = `${x * d}px ${y * d}px`;
+  });
+});
+setInterval(() => { const c = $("#cutoff"); if (c) c.innerHTML = cutoffText(); }, 30000);
 
 $("#account").textContent = `${CUSTOMER.name} · ${CUSTOMER.account}`;
 render();

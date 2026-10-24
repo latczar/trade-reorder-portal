@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Trade Reorder Portal</title>
   <meta name="description" content="Prototype B2B reorder portal for a wholesale distributor. All data is made up.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@1&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="src/styles.css">
 </head>
 <body>
@@ -19,6 +22,8 @@
       <a href="#/intake">Email intake</a>
       <a href="#/insight">Insight</a>
     </nav>
+    <button class="search-pill" data-action="palette" aria-label="Search or type an order (Ctrl K)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span>Search or type an order…</span><kbd>Ctrl K</kbd></button>
     <div class="account"><span id="account"></span><button class="link" data-action="reset">Reset demo</button></div>
   </header>
   <div class="notice">Prototype with made-up data. Nothing is ordered or sent anywhere.</div>
@@ -31,6 +36,13 @@
     <a href="#/orders"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6"/></svg>Orders</a>
   </nav>
   <div id="toast" class="toast" role="status" hidden></div>
+  <div id="palette" class="palette" hidden>
+    <div class="palette-box" role="dialog" aria-modal="true" aria-label="Search or type an order">
+      <input id="palette-input" type="text" placeholder="Search products, or type an order like “2 espresso beans, 4 12oz cups”…" autocomplete="off" spellcheck="false" aria-controls="palette-list">
+      <ul id="palette-list" role="listbox"></ul>
+      <p class="palette-hint small"><kbd>↑</kbd><kbd>↓</kbd> to move · <kbd>Enter</kbd> to choose · <kbd>Esc</kbd> to close</p>
+    </div>
+  </div>
   <script type="module" src="src/app.js"></script>
 </body>
 </html>

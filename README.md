@@ -23,7 +23,9 @@ All data is made up. Nothing is ordered or sent anywhere.
 
 ## What it does
 
-- **A proper shop front.** Home page, category browsing, search, product pages with the customer's own price and saving, and related products.
+- **A proper shop front.** A cinematic home page with gentle motion (switched off for anyone who prefers reduced motion), then a clean, fast shop: Home page, category browsing, search, product pages with the customer's own price and saving, and related products.
+- **Command bar.** Press Ctrl K (or tap search) to find any product, jump to a page, or type a whole order like "2 oat milk, 3 sanitiser" and add it in one go.
+- **Live cut-off clock.** The home page counts down to the 2pm cut-off and shows the delivery date it secures.
 - **Smart restock.** Learns how often the customer orders each product and suggests what is likely running low, with one tap to add it all.
 - **Type your order.** Customers can type an order the way they'd text their rep ("2 espresso beans, 4 12oz cups") and the shop finds the products.
 - **Built for phones.** Bottom tab bar, a basket bar that follows you, quantity steppers, swipeable categories, and tables that turn into cards. Remove and empty-basket actions can be undone.
