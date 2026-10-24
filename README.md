@@ -23,9 +23,9 @@ All data is made up. Nothing is ordered or sent anywhere.
 
 ## What it does
 
-- **A proper shop front.** A cinematic home page with gentle motion (switched off for anyone who prefers reduced motion), then a clean, fast shop: Home page, category browsing, search, product pages with the customer's own price and saving, and related products.
+- **A proper shop front.** Real product photography, category browsing, search, product pages with the customer's own price, saving and pack details, and related products. Motion is limited to a short reveal when a page opens and is switched off for anyone who prefers reduced motion.
 - **Command bar.** Press Ctrl K (or tap search) to find any product, jump to a page, or type a whole order like "2 oat milk, 3 sanitiser" and add it in one go.
-- **Live cut-off clock.** The home page counts down to the 2pm cut-off and shows the delivery date it secures.
+- **Live cut-off clock.** A delivery docket on the home page counts down to the 2pm cut-off and shows the delivery date it secures.
 - **Smart restock.** Learns how often the customer orders each product and suggests what is likely running low, with one tap to add it all.
 - **Type your order.** Customers can type an order the way they'd text their rep ("2 espresso beans, 4 12oz cups") and the shop finds the products.
 - **Built for phones.** Bottom tab bar, a basket bar that follows you, quantity steppers, swipeable categories, and tables that turn into cards. Remove and empty-basket actions can be undone.
@@ -62,9 +62,37 @@ Then open http://localhost:5173. To use Claude for email intake, deploy to Verce
 | `src/logic.js` | Business rules: pricing, stock and checkout checks, delivery dates. No DOM, fully unit tested |
 | `src/intake.js` | Email intake: calls the API, falls back to the keyword matcher, checks suggestions |
 | `src/app.js` | The screens and the mock ERP sync |
-| `src/images.js` | Drawn product images, so the demo needs no photo licences |
+| `src/images.js` | Product photos (WebP in `assets/`), alt text and credits |
 | `api/parse-order.js` | Serverless function that calls Claude with structured output |
 | `tests/` | Unit tests for the rules and the intake checks |
+
+## Design
+
+Warm paper background, near-black ink and one signal colour (vermilion) for the things that matter: the cut-off, savings, the active page. Archivo (condensed for headings) is paired with IBM Plex Mono for product codes, prices and labels, so the shop reads like a trade catalogue rather than a template. Images are stored in the repo as WebP at 480 and 960 px and lazy-loaded below the fold.
+
+## Photo credits
+
+Photos are free to use under CC0 or CC BY 2.0, found through [Openverse](https://openverse.org). Each product page also credits its photo.
+
+| Product | Photographer | Licence |
+| --- | --- | --- |
+| CT-101 | [Michal Jarmoluk](https://stocksnap.io/photo/coffee-beans-PM0QDTADIN) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| CT-104 | [Anastasia Zhenina](https://stocksnap.io/photo/coffee-beans-X2HTBSJDKF) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| CT-210 | [S Baker](https://www.flickr.com/photos/57373363@N00/67864825) | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
+| CT-305 | [Tohm Brigitte](https://stocksnap.io/photo/hot-chocolate-TKMJJ9D81G) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| DS-001 | [Senior Living](https://stocksnap.io/photo/coffee-cup-KBPLPXZBRB) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| DS-002 | [Lisa Fotios](https://stocksnap.io/photo/woman-holding-UESXHK58NI) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| DS-010 | [Jeffrey Betts](https://stocksnap.io/photo/coffee-cup-VS5KJKKI33) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| DS-011 | [renaissancechambara](https://www.flickr.com/photos/39435232@N00/2451804238) | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
+| DS-040 | [準建築人手札網站 Forgemind ArchiMedia](https://www.flickr.com/photos/44343967@N00/10781395574) | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
+| CL-200 | [the.barb](https://www.flickr.com/photos/46439517@N00/402739799) | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
+| CL-210 | [Chevanon](https://stocksnap.io/photo/chocolate-hot-GEBMMDX5VW) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| CL-300 | [Mark Turnauckas](https://www.flickr.com/photos/30329962@N08/6009596457) | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
+| DA-001 | [markhillary](https://www.flickr.com/photos/56087830@N00/829573216) | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
+| DA-020 | [AmazingAlmonds](https://www.flickr.com/photos/71430589@N02/8596721996) | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
+| BK-100 | [Olia Gozha](https://stocksnap.io/photo/croissant-bread-8GMCKXR6GE) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| BK-120 | [A writer afoot](https://www.flickr.com/photos/60255232@N00/4533917238) | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
+| Home page | [Tim Wright](https://stocksnap.io/photo/coffee-cafe-ICUFSN4V4U) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 
 ## What a production version would add
 

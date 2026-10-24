@@ -4,7 +4,7 @@ import {
   mergeLines, usuals, digitalShare, localIso, restockSuggestions, MAX_ERP_ATTEMPTS, retryDelayMs,
 } from "./logic.js";
 import { parseEmail, reviewSuggestions, fallbackParse, SAMPLE_EMAILS } from "./intake.js";
-import { productImage, categoryImage } from "./images.js";
+import { productImage, categoryImage, photoCredit } from "./images.js";
 
 // ---------- State (localStorage keeps the basket across refreshes; the app works without it) ----------
 
@@ -71,7 +71,7 @@ const reduceMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)
 
 // A small copy of the product image flies to the basket, then the count pops.
 function flyToBasket(fromEl) {
-  const img = fromEl?.closest(".card, .pdp, .usual, .palette-row")?.querySelector("svg");
+  const img = fromEl?.closest(".card, .pdp, .usual, .palette-row")?.querySelector("img");
   const target = [...document.querySelectorAll("#basket-count, #tab-count")].find((el) => el.offsetParent);
   if (!img || !target || reduceMotion()) return;
   const a = img.getBoundingClientRect();
@@ -152,13 +152,14 @@ function viewCatalogue() {
 
 
 function card(p) {
+  const flag = p.stock === 0 ? `<span class="flag out">Out of stock</span>` : p.stock < 20 ? `<span class="flag">${p.stock} left</span>` : "";
   return `<article class="card">
-    <a class="card-img" href="#/product/${p.sku}" aria-label="${esc(p.name)}">${productImage(p)}</a>
+    <a class="card-img" href="#/product/${p.sku}" tabindex="-1" aria-hidden="true">${productImage(p)}${flag}</a>
     <div class="card-body">
+      <span class="code">${p.sku} · ${esc(p.pack)}</span>
       <a class="card-title" href="#/product/${p.sku}">${esc(p.name)}</a>
-      <div class="muted small">${esc(p.pack)}</div>
       <div class="card-foot">
-        <div><strong>${money(price(p))}</strong> <span class="muted small strike">${money(p.listPrice)}</span><div>${stockLabel(p)}</div></div>
+        <div><span class="price">${money(price(p))}</span><span class="muted strike">${money(p.listPrice)}</span></div>
         ${addControl(p)}
       </div>
     </div>
@@ -173,7 +174,8 @@ function cutoffText(now = new Date()) {
   if (now >= cutoff) cutoff.setDate(cutoff.getDate() + 1);
   const mins = Math.max(0, Math.round((cutoff - now) / 60000));
   const h = Math.floor(mins / 60);
-  return `<span class="pulse" aria-hidden="true"></span> Order in <strong>${h ? `${h}h ` : ""}${mins % 60}m</strong> for delivery <strong>${fmtDate(next)}</strong>`;
+  return `<span class="label">Next delivery</span><strong>${fmtDate(next)}</strong>
+    <span class="label">Order within</span><span class="when">${h ? `${h}h ` : ""}${mins % 60}m · cut-off 14:00</span>`;
 }
 
 function viewRestock() {
@@ -183,8 +185,8 @@ function viewRestock() {
     <div class="panel-head"><h2>Likely running low</h2><span class="muted small">From your ordering pattern</span></div>
     <ul class="restock">
       ${due.map((s) => { const p = product(s.sku); return `<li>
-        <div class="thumb">${productImage(p)}</div>
-        <div><strong>${esc(p.name)}</strong><div class="muted small">You order about every ${s.every} days · ${s.daysLeft <= 0 ? "due now" : `due in ${s.daysLeft} day${s.daysLeft === 1 ? "" : "s"}`}</div></div>
+        <span class="thumb">${productImage(p, { sizes: "52px" })}</span>
+        <div><strong>${esc(p.name)}</strong><div class="muted small">You order about every ${s.every} days · <span class="due">${s.daysLeft <= 0 ? "due now" : `due in ${s.daysLeft} day${s.daysLeft === 1 ? "" : "s"}`}</span></div></div>
         <div class="muted small nowrap">${s.qty} × ${money(price(p))}</div></li>`; }).join("")}
     </ul>
     <button class="btn primary block" data-action="restock">Add ${due.length} suggested item${due.length === 1 ? "" : "s"}</button>
@@ -212,20 +214,20 @@ function viewHome() {
   const mine = usuals(state.orders, 4).map(({ sku }) => product(sku));
   const last = state.orders[0];
   return `
-    <section class="cine" id="cine">
-      <div class="cine-glow" aria-hidden="true"></div>
-      <div class="cine-copy">
-        <p class="eyebrow">Trade account · ${esc(CUSTOMER.name)}</p>
-        <h1>Restocking,<br><em>without the admin.</em></h1>
-        <p class="cine-sub">Your prices, live stock, and a shop that knows what you're about to run out of.</p>
-        <p class="cutoff" id="cutoff" aria-live="polite">${cutoffText()}</p>
-        <div class="row"><a class="btn glow" href="#/shop">Shop all products</a>
-          ${last ? `<button class="btn ghost" data-reorder="${last.id}">Reorder ${last.id}</button>` : ""}
-          <button class="btn ghost" data-action="palette">Search or type an order <kbd>Ctrl K</kbd></button></div>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow reveal">Trade account · ${esc(CUSTOMER.name)}</p>
+        <h1 class="reveal" style="--i:1">Restock the counter <span>in a minute.</span></h1>
+        <p class="hero-sub reveal" style="--i:2">Your contract prices, live stock, and a shop that remembers what you order and when you'll run out.</p>
+        <div class="docket reveal" style="--i:3" id="cutoff">${cutoffText()}</div>
+        <div class="row reveal" style="--i:4"><a class="btn primary" href="#/shop">Shop all products</a>
+          ${last ? `<button class="btn" data-reorder="${last.id}">Reorder ${last.id}</button>` : ""}
+          <button class="btn" data-action="palette">Type an order <kbd>Ctrl K</kbd></button></div>
       </div>
-      <div class="cine-stage" aria-hidden="true">
-        ${["CT-101", "DS-002", "DA-020", "BK-100"].map((sku, i) => `<div class="float f${i}" data-depth="${(i + 1) * 6}">${productImage(product(sku))}</div>`).join("")}
-      </div>
+      <figure class="hero-photo reveal" style="--i:1">
+        <img src="assets/hero-960.webp" width="960" height="640" alt="" fetchpriority="high">
+        <figcaption>${photoCredit("hero")}</figcaption>
+      </figure>
     </section>
 
     <div class="split even">
@@ -234,9 +236,11 @@ function viewHome() {
     </div>
 
     <section>
-      <div class="section-head"><h2>Shop by category</h2></div>
+      <div class="section-head"><h2>Shop by category</h2><a href="#/shop">All ${PRODUCTS.length} products</a></div>
       <div class="cats">
-        ${CATEGORIES.map((c) => `<a class="cat" href="#/shop?cat=${encodeURIComponent(c)}">${categoryImage(c, PRODUCTS)}<span>${esc(c)}</span></a>`).join("")}
+        ${CATEGORIES.map((c, i) => `<a class="cat" href="#/shop?cat=${encodeURIComponent(c)}">${categoryImage(c, PRODUCTS)}
+          <span class="cat-no">0${i + 1}</span>
+          <span class="cat-text"><b>${esc(c)}</b><span>${PRODUCTS.filter((p) => p.category === c).length} products</span></span></a>`).join("")}
       </div>
     </section>
 
@@ -255,11 +259,13 @@ function viewShop() {
     <div class="shop">
       <aside class="filters-side">
         <h2>Categories</h2>
-        ${["All", ...CATEGORIES].map((c) => `<button class="cat-link ${c === ui.category ? "on" : ""}" data-filter="${esc(c)}">${esc(c)}</button>`).join("")}
+        ${["All", ...CATEGORIES].map((c) => `<button class="cat-link ${c === ui.category ? "on" : ""}" data-filter="${esc(c)}" aria-pressed="${c === ui.category}">${esc(c)}
+          <span>${c === "All" ? PRODUCTS.length : PRODUCTS.filter((p) => p.category === c).length}</span></button>`).join("")}
       </aside>
       <section>
-        <div class="section-head">
-          <h2>${ui.category === "All" ? "All products" : esc(ui.category)} <span class="muted small">${list.length} items</span></h2>
+        <div class="shop-head">
+          <div class="shop-title"><p class="eyebrow">${list.length} item${list.length === 1 ? "" : "s"} · your band ${CUSTOMER.priceBand} prices</p>
+            <h1>${ui.category === "All" ? "All products" : esc(ui.category)}</h1></div>
           <input id="search" type="search" placeholder="Search by name or code…" autocomplete="off" value="${esc(ui.query)}" aria-label="Search products">
         </div>
         <div class="grid">${list.map(card).join("") || `<p class="muted">No products match. Try a shorter search.</p>`}</div>
@@ -275,13 +281,22 @@ function viewProduct(sku) {
   return `
     <p class="crumbs"><a href="#/shop">Shop</a> / <button class="link" data-filter="${esc(p.category)}">${esc(p.category)}</button> / ${esc(p.name)}</p>
     <section class="pdp">
-      <div class="pdp-img">${productImage(p)}</div>
+      <div>
+        <figure class="pdp-img">${productImage(p, { alt: true, sizes: "(max-width: 820px) 100vw, 640px", eager: true })}</figure>
+        <p class="muted small">${photoCredit(p.sku)}</p>
+      </div>
       <div class="pdp-info">
+        <p class="eyebrow">${esc(p.category)}</p>
         <h1>${esc(p.name)}</h1>
-        <p class="muted">${esc(p.pack)} · Code ${p.sku}</p>
-        <p class="pdp-price">${money(price(p))} <span class="muted small">per pack, ${p.vat ? "plus VAT" : "zero-rated VAT"}</span></p>
-        <p class="small">Your band ${CUSTOMER.priceBand} price saves ${money(saving)} on the list price of ${money(p.listPrice)}.</p>
-        <p>${stockLabel(p)}${p.minQty > 1 ? ` <span class="muted small">· Minimum order ${p.minQty} packs</span>` : ""}</p>
+        <p>${stockLabel(p)}</p>
+        <p class="pdp-price">${money(price(p))} <span class="muted">per pack, ${p.vat ? "plus VAT" : "zero-rated VAT"}</span></p>
+        <span class="saving">Band ${CUSTOMER.priceBand}: you save ${money(saving)} on ${money(p.listPrice)}</span>
+        <dl class="spec">
+          <div><dt>Code</dt><dd>${p.sku}</dd></div>
+          <div><dt>Pack</dt><dd>${esc(p.pack)}</dd></div>
+          <div><dt>Minimum order</dt><dd>${p.minQty} pack${p.minQty === 1 ? "" : "s"}</dd></div>
+          <div><dt>VAT</dt><dd>${p.vat ? `${p.vat}%` : "Zero-rated"}</dd></div>
+        </dl>
         <div class="row">
           ${addControl(p, true)}
           ${inBasket(p.sku) ? `<a class="btn" href="#/basket">Go to basket</a>` : ""}
@@ -356,8 +371,9 @@ function viewBasket() {
               const p = product(l.sku);
               const issues = lineProblems(p, l.qty);
               return `<tr class="${issues.length ? "has-issue" : ""}">
-                <td><strong>${esc(p.name)}</strong><div class="muted small">${p.sku} · ${esc(p.pack)}</div>
-                  ${issues.map((i) => `<div class="issue">${esc(i)}</div>`).join("")}</td>
+                <td><div class="line-prod"><span class="thumb">${productImage(p, { sizes: "52px" })}</span>
+                  <div><strong>${esc(p.name)}</strong><div class="code">${p.sku} · ${esc(p.pack)}</div>
+                  ${issues.map((i) => `<div class="issue">${esc(i)}</div>`).join("")}</div></div></td>
                 <td class="num" data-label="Price">${money(price(p))}</td>
                 <td class="num" data-label="Qty">${addControl(p)}</td>
                 <td class="num" data-label="Total">${money(price(p) * l.qty)}</td>
@@ -429,6 +445,7 @@ function viewInsight() {
   const pct = (n) => Math.round((n / total) * 100);
 
   return `
+    <div class="shop-title"><p class="eyebrow">Sales team · all customers, this month</p><h1>Moving orders online</h1></div>
     <div class="stats">
       <div class="stat"><span class="muted small">Orders through the portal</span><strong>${Math.round(share * 100)}%</strong>
         <div class="meter" role="meter" aria-label="Portal share" aria-valuenow="${Math.round(share * 100)}" aria-valuemin="0" aria-valuemax="100">
@@ -532,21 +549,23 @@ function render() {
   if (route === "shop") ui.category = cat && CATEGORIES.includes(cat) ? cat : "All";
   const view = ROUTES[route] ?? viewHome;
   const key = route + (arg ?? "");
-  if (key !== render.last) window.scrollTo(0, 0);
+  const entering = key !== render.last;
+  if (entering) window.scrollTo(0, 0);
   render.last = key;
   const active = document.activeElement;
   const focusId = active?.id;
   const caret = active?.selectionStart;
   $("#view").innerHTML = view(arg);
+  // The page-open reveal plays once per route, not on every re-render (steppers, typing).
+  $("#view").classList.toggle("enter", entering && !reduceMotion());
   document.querySelectorAll("nav a").forEach((a) => a.classList.toggle("active", a.getAttribute("href") === "#/" + (route === "product" ? "shop" : route)));
-  $("#basket-count").textContent = basketCount();
-  $("#tab-count").textContent = basketCount();
+  for (const el of [$("#basket-count"), $("#tab-count")]) { el.textContent = basketCount(); el.hidden = !basketCount(); }
   document.querySelectorAll(".tabbar a").forEach((a) => a.classList.toggle("active", a.getAttribute("href") === "#/" + (route === "product" ? "shop" : route)));
   const bar = $("#basketbar");
   const showBar = basketCount() > 0 && ["home", "shop", "product", "catalogue"].includes(route);
   bar.hidden = !showBar;
   document.body.classList.toggle("has-bar", showBar);
-  if (showBar) bar.innerHTML = `<span>${basketCount()} item${basketCount() === 1 ? "" : "s"} · ${money(basketTotals(state.basket, PRODUCTS, CUSTOMER.priceBand, BAND_DISCOUNT).gross)}</span><strong>View basket →</strong>`;
+  if (showBar) bar.innerHTML = `<span>${basketCount()} item${basketCount() === 1 ? "" : "s"} · ${money(basketTotals(state.basket, PRODUCTS, CUSTOMER.priceBand, BAND_DISCOUNT).gross)}</span><strong>View basket</strong>`;
   const el = focusId && document.getElementById(focusId);
   if (el) {
     el.focus();
@@ -652,7 +671,8 @@ document.addEventListener("change", (e) => {
 });
 
 window.addEventListener("hashchange", () => {
-  if (document.startViewTransition && !reduceMotion()) document.startViewTransition(render);
+  // A quick second navigation skips the running transition; that is expected, not an error.
+  if (document.startViewTransition && !reduceMotion()) document.startViewTransition(render).ready.catch(() => {});
   else render();
 });
 
@@ -690,7 +710,7 @@ function renderPalette() {
       <span class="tag">Add order</span><span>${r.lines.map((l) => `${l.qty} × ${esc(product(l.sku).name)}`).join(", ")}</span><kbd>Enter</kbd></li>`;
     if (r.kind === "page") return `<li class="palette-row${on}" data-i="${i}" role="option" aria-selected="${!!on}"><span class="tag">Go to</span><span>${esc(r.name)}</span></li>`;
     return `<li class="palette-row${on}" data-i="${i}" role="option" aria-selected="${!!on}">
-      <span class="thumb">${productImage(r.p)}</span><span>${esc(r.p.name)} <span class="muted small">${esc(r.p.pack)}</span></span>
+      <span class="thumb">${productImage(r.p, { sizes: "40px" })}</span><span>${esc(r.p.name)} <span class="muted small">${esc(r.p.pack)}</span></span>
       <span class="small">${money(price(r.p))}</span></li>`;
   }).join("") || `<li class="palette-empty">Nothing found. Try "2 oat milk, 3 sanitiser".</li>`;
   pal.results = res;
@@ -733,21 +753,11 @@ $("#palette").addEventListener("click", (e) => {
   if (row) runPalette(Number(row.dataset.i));
 });
 
-// ---------- Hero: gentle parallax and the live cut-off clock ----------
+// ---------- Live cut-off clock ----------
 
-document.addEventListener("pointermove", (e) => {
-  const stage = document.querySelector(".cine-stage");
-  if (!stage || reduceMotion() || e.pointerType !== "mouse") return;
-  const x = e.clientX / innerWidth - 0.5;
-  const y = e.clientY / innerHeight - 0.5;
-  stage.querySelectorAll(".float").forEach((f) => {
-    const d = Number(f.dataset.depth);
-    f.style.translate = `${x * d}px ${y * d}px`;
-  });
-});
 setInterval(() => { const c = $("#cutoff"); if (c) c.innerHTML = cutoffText(); }, 30000);
 
-$("#account").textContent = `${CUSTOMER.name} · ${CUSTOMER.account}`;
+$("#account").textContent = `${CUSTOMER.name} · ${CUSTOMER.account} · Band ${CUSTOMER.priceBand} · ${money(CUSTOMER.creditLimit - CUSTOMER.creditUsed)} credit`;
 render();
 // Resume any syncs that were in flight when the page was closed.
 state.orders.filter((o) => o.erp === "pending" || o.erp === "retrying").forEach((o) => syncToErp(o.id));

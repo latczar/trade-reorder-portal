@@ -7,13 +7,18 @@
   <meta name="description" content="Prototype B2B reorder portal for a wholesale distributor. All data is made up.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@1&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <meta name="theme-color" content="#f2efe7">
   <link rel="stylesheet" href="src/styles.css">
 </head>
 <body>
   <a class="skip" href="#view">Skip to content</a>
+  <div class="strip">
+    <span>Prototype <span class="dot">·</span> made-up data<span class="hide-sm">, nothing is ordered or sent</span></span>
+    <div class="strip-account"><span id="account"></span><button class="link" data-action="reset">Reset demo</button></div>
+  </div>
   <header class="top">
-    <a class="brand" href="#/home"><span class="mark" aria-hidden="true"></span>Harbour Wholesale <span class="muted">Trade</span></a>
+    <a class="brand" href="#/home" translate="no"><b>Harbour</b><span>Wholesale · Trade</span></a>
     <nav class="topnav" aria-label="Main">
       <a href="#/home">Home</a>
       <a href="#/shop">Shop</a>
@@ -23,10 +28,9 @@
       <a href="#/insight">Insight</a>
     </nav>
     <button class="search-pill" data-action="palette" aria-label="Search or type an order (Ctrl K)">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span>Search or type an order…</span><kbd>Ctrl K</kbd></button>
-    <div class="account"><span id="account"></span><button class="link" data-action="reset">Reset demo</button></div>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span>Search or type an order…</span><kbd>Ctrl K</kbd>
+    </button>
   </header>
-  <div class="notice">Prototype with made-up data. Nothing is ordered or sent anywhere.</div>
   <main id="view" tabindex="-1"></main>
   <a id="basketbar" class="basketbar" href="#/basket" hidden></a>
   <nav class="tabbar" aria-label="Main (mobile)">
