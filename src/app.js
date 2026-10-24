@@ -545,6 +545,7 @@ function render() {
   const bar = $("#basketbar");
   const showBar = basketCount() > 0 && ["home", "shop", "product", "catalogue"].includes(route);
   bar.hidden = !showBar;
+  document.body.classList.toggle("has-bar", showBar);
   if (showBar) bar.innerHTML = `<span>${basketCount()} item${basketCount() === 1 ? "" : "s"} · ${money(basketTotals(state.basket, PRODUCTS, CUSTOMER.priceBand, BAND_DISCOUNT).gross)}</span><strong>View basket →</strong>`;
   const el = focusId && document.getElementById(focusId);
   if (el) {
